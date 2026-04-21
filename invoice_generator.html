@@ -542,11 +542,11 @@ function buildPDF(){
   });
   if(y+30>270){doc.addPage();y=20;}
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
-  doc.text('Subtotal',110,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
-  if(pct>0){doc.setFontSize(9);doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',110,y);doc.setFontSize(10);doc.setTextColor(0);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;}
+  doc.text('Subtotal',155,y,{align:'right'});doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
+  if(pct>0){doc.setFontSize(9);doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',155,y,{align:'right'});doc.setFontSize(10);doc.setTextColor(0);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;}
   doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
   doc.setFont('helvetica','bold');doc.setFontSize(13);
-  doc.text('TOTAL',130,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
+  doc.text('TOTAL',155,y,{align:'right'});doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
   y+=14;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);
   doc.text('Payment Details:',20,y);y+=5;
   doc.text('All payment must be made payable to Halo Optical (M) Sdn Bhd (HLB A/C: 33000051915).',20,y);
