@@ -393,7 +393,7 @@ function parseXLSX(raw){
     const orderNo=String(row[orderCol]||'').trim();
     const invDate=formatExcelDate(row[dateCol]);
     const amt=parseFloat(row[amtCol])||0;
-    const ref=String(row[refCol]||'').trim();
+    const ref=String(row[refCol]||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<100))continue;
     if(amt===0&&!orderNo)continue;
     rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
@@ -418,7 +418,7 @@ function parseXLSXObjects(data){
       invDate=String(rawDate).trim();
     }
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||0);
-    const ref=String(row['Remarks']||row['Ref No']||'').trim();
+    const ref=String(row['Remarks']||row['Ref No']||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<1000))return;
     if(amt===0&&!orderNo)return;
     rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
@@ -433,7 +433,7 @@ function parseCSV(data){
     const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
     const invDate=String(row['Invoice Date']||row['Date']||'').trim();
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Amount']||0);
-    const ref=String(row['Remarks']||row['Ref No']||'').trim();
+    const ref=String(row['Remarks']||row['Ref No']||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
     if(orderNo)rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
   });
   if(!rows.length){document.getElementById('uploadStatus').textContent='No data found.';return;}
@@ -522,18 +522,12 @@ function buildPDF(){
     catItems.forEach(item=>{
       const qty=parseFloat(item.qty)||1;
       const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
-      // Handle multi-line bill ref — split by newline and wrap at 30 chars per line
-      const billRefRaw=String(item.billRef||'-').replace(/\\n/g,'\n').trim();
+      // Bill ref - now single line with ' / ' separator, wrap at 35 chars
+      const billRefFull=String(item.billRef||'-').trim();
       const billRefLines=[];
-      billRefRaw.split('\n').forEach(segment=>{
-        const seg=segment.trim();
-        if(!seg)return;
-        // Wrap each segment at 28 chars
-        for(let s=0;s<seg.length;s+=28){billRefLines.push(seg.substring(s,s+28));}
-      });
+      for(let s=0;s<billRefFull.length;s+=35)billRefLines.push(billRefFull.substring(s,s+35));
       if(!billRefLines.length)billRefLines.push('-');
       const rowHeight=Math.max(5,billRefLines.length*4+2);
-      // Check if row will overflow page
       if(y+rowHeight>255){doc.addPage();y=20;}
       doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
       doc.text(String(item.orderNo||'-').substring(0,18),55,y);
@@ -553,7 +547,7 @@ function buildPDF(){
   if(y+30>270){doc.addPage();y=20;}
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
   doc.text('Subtotal',138,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
-  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',138,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
+  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',105,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
   doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
   doc.setFont('helvetica','bold');doc.setFontSize(13);
   doc.text('TOTAL',138,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
