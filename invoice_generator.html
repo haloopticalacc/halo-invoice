@@ -522,28 +522,35 @@ function buildPDF(){
     catItems.forEach(item=>{
       const qty=parseFloat(item.qty)||1;
       const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
-      // Handle multi-line bill ref
+      // Handle multi-line bill ref — split by newline and wrap at 30 chars per line
       const billRefRaw=String(item.billRef||'-').replace(/\\n/g,'\n').trim();
       const billRefLines=[];
-      billRefRaw.split('\n').forEach(line=>{
-        // Split each line into chunks of max 18 chars
-        const words=line.trim();
-        if(words.length<=18){billRefLines.push(words);}
-        else{billRefLines.push(words.substring(0,18));if(words.length>18)billRefLines.push(words.substring(18,36));}
+      billRefRaw.split('\n').forEach(segment=>{
+        const seg=segment.trim();
+        if(!seg)return;
+        // Wrap each segment at 28 chars
+        for(let s=0;s<seg.length;s+=28){billRefLines.push(seg.substring(s,s+28));}
       });
-      const rowHeight=Math.max(5, billRefLines.length*4+1);
+      if(!billRefLines.length)billRefLines.push('-');
+      const rowHeight=Math.max(5,billRefLines.length*4+2);
+      // Check if row will overflow page
+      if(y+rowHeight>255){doc.addPage();y=20;}
       doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
       doc.text(String(item.orderNo||'-').substring(0,18),55,y);
       doc.text(cat.substring(0,14),92,y);
       billRefLines.forEach((line,li)=>doc.text(line,118,y+li*4));
       doc.text(String(qty),148,y);
       doc.text('RM '+lineTotal,185,y,{align:'right'});
-      y+=rowHeight;if(y>255){doc.addPage();y=20;}
+      y+=rowHeight;
     });
     const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)),0);
+    // Make sure subtotal line doesn't overflow
+    if(y+12>270){doc.addPage();y=20;}
     doc.setTextColor(120);doc.text('Subtotal — '+cat,118,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
     doc.setTextColor(0);y+=7;doc.setDrawColor(210);doc.line(20,y,190,y);y+=5;
   });
+  // Make sure totals section doesn't overflow
+  if(y+30>270){doc.addPage();y=20;}
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
   doc.text('Subtotal',138,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
   if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',138,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
