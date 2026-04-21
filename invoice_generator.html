@@ -418,8 +418,7 @@ function parseXLSXObjects(data){
       invDate=String(rawDate).trim();
     }
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||0);
-    const ref=String(row['Remarks']||row['Ref No']||'').trim();
-    // Skip row number rows (1, 2, 3...) and empty rows
+    const ref=String(row['Remarks']||row['Ref No']||'').split('\n')[0].trim();
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<1000))return;
     if(amt===0&&!orderNo)return;
     rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
@@ -526,7 +525,8 @@ function buildPDF(){
       doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
       doc.text(String(item.orderNo||'-').substring(0,18),55,y);
       doc.text(cat.substring(0,14),92,y);
-      doc.text(String(item.billRef||'-').substring(0,14),118,y);
+      const billRefClean=String(item.billRef||'-').split('\n')[0].split('\\n')[0].trim().substring(0,14);
+      doc.text(billRefClean,118,y);
       doc.text(String(qty),148,y);
       doc.text('RM '+lineTotal,185,y,{align:'right'});
       y+=5;if(y>255){doc.addPage();y=20;}
