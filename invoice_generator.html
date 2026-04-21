@@ -353,51 +353,41 @@ function processFile(file){
 }
 
 function parseXLSX(raw){
-  // Find header row — look for row containing "Received Order No"
   let headerIdx=-1,headers=[];
   for(let i=0;i<raw.length;i++){
     const row=raw[i].map(c=>String(c||'').trim());
-    const found=row.some(c=>c==='Received Order No'||c==='Invoice No'||c==='Received Order No');
-    if(found){headerIdx=i;headers=row;break;}
+    if(row.some(c=>c==='Received Order No'||c==='Invoice No')){headerIdx=i;headers=row;break;}
   }
+  if(headerIdx===-1){document.getElementById('uploadStatus').textContent='Cannot find header row. Make sure file has "Received Order No" column.';return;}
 
-  if(headerIdx===-1){
-    document.getElementById('uploadStatus').textContent='Cannot find header row. Make sure your file has "Received Order No" column.';
-    return;
-  }
-
-  // Find column indices
-  const invCol=headers.findIndex(h=>h==='Received Order No'||h==='Invoice No');
+  const dateCol=headers.findIndex(h=>h==='Invoice Date'||h==='Date');
+  const orderCol=headers.findIndex(h=>h==='Received Order No'||h==='Invoice No');
   const amtCol=headers.findIndex(h=>h==='Grand Total'||h==='Balance Amount'||h==='Sub Total');
   const refCol=headers.findIndex(h=>h==='Remarks'||h==='Ref No');
 
   const rows=[];
   for(let i=headerIdx+1;i<raw.length;i++){
     const row=raw[i];
-    const inv=String(row[invCol]||'').trim();
+    const orderNo=String(row[orderCol]||'').trim();
+    const invDate=String(row[dateCol]||'').trim();
     const amt=parseFloat(row[amtCol])||0;
     const ref=String(row[refCol]||'').trim();
-    // Skip empty rows and total/summary rows
-    if(!inv||inv===''||inv==='No')continue;
-    if(!isNaN(Number(inv))&&Number(inv)<100)continue; // skip row numbers like 1,2,3
-    if(amt===0&&!inv)continue;
-    rows.push({invNo:inv,ref,amt:amt.toFixed(2)});
+    if(!orderNo||!isNaN(Number(orderNo))&&Number(orderNo)<100)continue;
+    if(amt===0&&!orderNo)continue;
+    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
   }
-
-  if(!rows.length){
-    document.getElementById('uploadStatus').textContent='No valid data rows found. Found header at row '+(headerIdx+1)+' but no data after it.';
-    return;
-  }
+  if(!rows.length){document.getElementById('uploadStatus').textContent='No valid data rows found.';return;}
   showPreview(rows);
 }
 
 function parseCSV(data){
   const rows=[];
   data.forEach(row=>{
-    const inv=String(row['Received Order No']||row['Invoice No']||row['invoice_no']||'').trim();
+    const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
+    const invDate=String(row['Invoice Date']||row['Date']||'').trim();
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Amount']||0);
     const ref=String(row['Remarks']||row['Ref No']||'').trim();
-    if(inv)rows.push({invNo:inv,ref,amt:amt.toFixed(2)});
+    if(orderNo)rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
   });
   if(!rows.length){document.getElementById('uploadStatus').textContent='No data found.';return;}
   showPreview(rows);
@@ -410,15 +400,17 @@ function showPreview(rows){
   const preview=rows.slice(0,5);
   document.getElementById('previewTableContainer').innerHTML=`
     <table class="preview-table">
-      <thead><tr><th>Invoice No</th><th>Ref No</th><th>Amount (RM)</th></tr></thead>
-      <tbody>${preview.map(r=>`<tr><td>${r.invNo}</td><td>${r.ref||'-'}</td><td>RM ${r.amt}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Invoice Date</th><th>Receive Order No</th><th>Bill Ref</th><th>Amount (RM)</th></tr></thead>
+      <tbody>${preview.map(r=>`<tr><td>${r.invRefNo||'-'}</td><td>${r.orderNo||'-'}</td><td>${r.billRef||'-'}</td><td>RM ${r.amt}</td></tr>`).join('')}</tbody>
     </table>
     ${rows.length>5?`<div style="font-size:12px;color:#888;margin-top:4px;">...and ${rows.length-5} more rows</div>`:''}`;
 }
 
 function confirmImport(){
   const cat=document.getElementById('defaultCat').value;
-  pendingImport.forEach(r=>{items.push({id:Date.now()+Math.random(),invNo:r.invNo,cat,ref:r.ref,amt:r.amt});});
+  pendingImport.forEach(r=>{
+    items.push({id:Date.now()+Math.random(),invRefNo:r.invRefNo,orderNo:r.orderNo,cat,customCat:'',billRef:r.billRef,qty:r.qty||'1',amt:r.amt});
+  });
   renderRows();cancelUpload();
   switchTab('manual',document.querySelectorAll('.tab')[0]);
   showStatus(pendingImport.length+' items imported!','success');
