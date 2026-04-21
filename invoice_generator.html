@@ -493,7 +493,7 @@ function buildPDF(){
     const logoImg=new Image();
     logoImg.src=LOGO_B64;
     // Logo: width=60mm, height=15mm, centered at x=105 (A4 width/2)
-    doc.addImage(LOGO_B64,'JPEG',60,4,90,18);
+    doc.addImage(LOGO_B64,'JPEG',45,3,120,24);
   }catch(e){}
   doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(0);
   doc.text('HALO OPTICAL (M) SDN BHD (1467170-P)',20,26);
