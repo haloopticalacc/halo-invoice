@@ -418,7 +418,7 @@ function parseXLSXObjects(data){
       invDate=String(rawDate).trim();
     }
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||0);
-    const ref=String(row['Remarks']||row['Ref No']||'').split('\n')[0].trim();
+    const ref=String(row['Remarks']||row['Ref No']||'').trim();
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<1000))return;
     if(amt===0&&!orderNo)return;
     rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
@@ -522,14 +522,23 @@ function buildPDF(){
     catItems.forEach(item=>{
       const qty=parseFloat(item.qty)||1;
       const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
+      // Handle multi-line bill ref
+      const billRefRaw=String(item.billRef||'-').replace(/\\n/g,'\n').trim();
+      const billRefLines=[];
+      billRefRaw.split('\n').forEach(line=>{
+        // Split each line into chunks of max 18 chars
+        const words=line.trim();
+        if(words.length<=18){billRefLines.push(words);}
+        else{billRefLines.push(words.substring(0,18));if(words.length>18)billRefLines.push(words.substring(18,36));}
+      });
+      const rowHeight=Math.max(5, billRefLines.length*4+1);
       doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
       doc.text(String(item.orderNo||'-').substring(0,18),55,y);
       doc.text(cat.substring(0,14),92,y);
-      const billRefClean=String(item.billRef||'-').split('\n')[0].split('\\n')[0].trim().substring(0,14);
-      doc.text(billRefClean,118,y);
+      billRefLines.forEach((line,li)=>doc.text(line,118,y+li*4));
       doc.text(String(qty),148,y);
       doc.text('RM '+lineTotal,185,y,{align:'right'});
-      y+=5;if(y>255){doc.addPage();y=20;}
+      y+=rowHeight;if(y>255){doc.addPage();y=20;}
     });
     const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)),0);
     doc.setTextColor(120);doc.text('Subtotal — '+cat,118,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
