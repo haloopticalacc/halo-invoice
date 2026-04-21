@@ -522,10 +522,10 @@ function buildPDF(){
     catItems.forEach(item=>{
       const qty=parseFloat(item.qty)||1;
       const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
-      // Bill ref - now single line with ' / ' separator, wrap at 35 chars
+      // Bill ref - max 14 chars per line (column width: x118 to x148)
       const billRefFull=String(item.billRef||'-').trim();
       const billRefLines=[];
-      for(let s=0;s<billRefFull.length;s+=35)billRefLines.push(billRefFull.substring(s,s+35));
+      for(let s=0;s<billRefFull.length;s+=14)billRefLines.push(billRefFull.substring(s,s+14));
       if(!billRefLines.length)billRefLines.push('-');
       const rowHeight=Math.max(5,billRefLines.length*4+2);
       if(y+rowHeight>255){doc.addPage();y=20;}
@@ -547,7 +547,7 @@ function buildPDF(){
   if(y+30>270){doc.addPage();y=20;}
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
   doc.text('Subtotal',138,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
-  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',105,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
+  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',85,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
   doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
   doc.setFont('helvetica','bold');doc.setFontSize(13);
   doc.text('TOTAL',138,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
