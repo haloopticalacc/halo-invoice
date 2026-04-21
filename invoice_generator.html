@@ -339,10 +339,24 @@ function processFile(file){
     const reader=new FileReader();
     reader.onload=e=>{
       try{
-        const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+        const wb=XLSX.read(e.target.result,{type:'array'});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-        parseXLSX(raw);
+        // Find header row first, then parse from there
+        const rawArr=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+        // Find header row index
+        let headerIdx=-1;
+        for(let i=0;i<rawArr.length;i++){
+          const row=rawArr[i];
+          if(row&&row.some(c=>String(c||'').trim()==='Received Order No')){headerIdx=i;break;}
+        }
+        if(headerIdx===-1){document.getElementById('uploadStatus').textContent='Cannot find "Received Order No" column.';return;}
+        // Re-read from header row onwards as objects
+        const dataRows=XLSX.utils.sheet_to_json(ws,{header:rawArr[headerIdx].map(c=>String(c||'').trim()),defval:'',range:headerIdx});
+        parseXLSXObjects(dataRows.slice(1)); // skip header row itself
+      }catch(err){
+        document.getElementById('uploadStatus').textContent='Error reading file: '+err.message;
+      }
+    };
       }catch(err){
         document.getElementById('uploadStatus').textContent='Error reading file: '+err.message;
       }
@@ -392,7 +406,31 @@ function parseXLSX(raw){
   showPreview(rows);
 }
 
-function parseCSV(data){
+function parseXLSXObjects(data){
+  // data is array of objects with keys matching header names
+  const rows=[];
+  data.forEach(row=>{
+    const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
+    const rawDate=row['Invoice Date']||row['Date']||'';
+    let invDate='';
+    if(rawDate instanceof Date){
+      invDate=rawDate.toISOString().split('T')[0];
+    } else if(typeof rawDate==='number'&&rawDate>40000){
+      const d=new Date(Math.round((rawDate-25569)*86400*1000));
+      invDate=d.toISOString().split('T')[0];
+    } else {
+      invDate=String(rawDate).trim();
+    }
+    const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||0);
+    const ref=String(row['Remarks']||row['Ref No']||'').trim();
+    // Skip row number rows (1, 2, 3...) and empty rows
+    if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<1000))return;
+    if(amt===0&&!orderNo)return;
+    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
+  });
+  if(!rows.length){document.getElementById('uploadStatus').textContent='No valid data rows found.';return;}
+  showPreview(rows);
+}
   const rows=[];
   data.forEach(row=>{
     const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
