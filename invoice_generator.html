@@ -141,7 +141,7 @@ tr:hover td{background:#fafafa;}
       </div>
 
       <div id="manualTab">
-        <div class="item-header"><span>Invoice ref no</span><span>Receive order no</span><span>Category</span><span>Bill ref no</span><span>Qty</span><span>Amount (RM)</span><span></span></div>
+        <div class="item-header"><span>Invoice date</span><span>Receive order no</span><span>Category</span><span>Bill ref no</span><span>Qty</span><span>Amount (RM)</span><span></span></div>
         <div id="itemRows"></div>
         <button class="add-row-btn" onclick="addRow()">+ Add line</button>
       </div>
@@ -292,7 +292,7 @@ function renderRows(){
     d.style.marginBottom='8px';
     d.innerHTML=`
       <div class="item-row">
-        <input value="${item.invRefNo||''}" placeholder="INV ref no" onchange="items[${i}].invRefNo=this.value"/>
+        <input value="${item.invRefNo||''}" placeholder="e.g. 2025-03-01" onchange="items[${i}].invRefNo=this.value"/>
         <input value="${item.orderNo||''}" placeholder="Receive order no" onchange="items[${i}].orderNo=this.value"/>
         <div style="display:flex;flex-direction:column;gap:3px;">
           <select onchange="items[${i}].cat=this.value;renderRows()">
@@ -470,7 +470,7 @@ function buildPDF(){
   let y=95;
   doc.setFillColor(240,240,240);doc.rect(20,y,170,7,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0);
-  doc.text('Invoice Ref No',22,y+5);
+  doc.text('Invoice Date',22,y+5);
   doc.text('Receive Order No',55,y+5);
   doc.text('Category',92,y+5);
   doc.text('Bill Ref No',118,y+5);
