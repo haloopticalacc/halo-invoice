@@ -510,10 +510,9 @@ function buildPDF(){
   doc.setFillColor(240,240,240);doc.rect(20,y,170,7,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0);
   doc.text('Invoice Date',22,y+5);
-  doc.text('Receive Order No',55,y+5);
-  doc.text('Category',92,y+5);
-  doc.text('Bill Ref No',118,y+5);
-  doc.text('Qty',148,y+5);
+  doc.text('Receive Order No',52,y+5);
+  doc.text('Bill Ref No',95,y+5);
+  doc.text('Qty',158,y+5);
   doc.text('Amount (RM)',185,y+5,{align:'right'});
   y+=11;doc.setFont('helvetica','normal');doc.setFontSize(8);
   Object.entries(byCategory).forEach(([cat,catItems])=>{
@@ -522,35 +521,32 @@ function buildPDF(){
     catItems.forEach(item=>{
       const qty=parseFloat(item.qty)||1;
       const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
-      // Bill ref - max 14 chars per line (column width: x118 to x148)
+      // Bill ref: column from x=95 to x=155, max ~28 chars per line at size 8
       const billRefFull=String(item.billRef||'-').trim();
       const billRefLines=[];
-      for(let s=0;s<billRefFull.length;s+=14)billRefLines.push(billRefFull.substring(s,s+14));
+      for(let s=0;s<billRefFull.length;s+=26)billRefLines.push(billRefFull.substring(s,s+26));
       if(!billRefLines.length)billRefLines.push('-');
       const rowHeight=Math.max(5,billRefLines.length*4+2);
       if(y+rowHeight>255){doc.addPage();y=20;}
-      doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
-      doc.text(String(item.orderNo||'-').substring(0,18),55,y);
-      doc.text(cat.substring(0,14),92,y);
-      billRefLines.forEach((line,li)=>doc.text(line,118,y+li*4));
-      doc.text(String(qty),148,y);
+      doc.text(String(item.invRefNo||'-').substring(0,16),22,y);
+      doc.text(String(item.orderNo||'-').substring(0,16),52,y);
+      billRefLines.forEach((line,li)=>doc.text(line,95,y+li*4));
+      doc.text(String(qty),158,y);
       doc.text('RM '+lineTotal,185,y,{align:'right'});
       y+=rowHeight;
     });
     const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)),0);
-    // Make sure subtotal line doesn't overflow
     if(y+12>270){doc.addPage();y=20;}
-    doc.setTextColor(120);doc.text('Subtotal — '+cat,118,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
+    doc.setTextColor(120);doc.text('Subtotal — '+cat,95,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
     doc.setTextColor(0);y+=7;doc.setDrawColor(210);doc.line(20,y,190,y);y+=5;
   });
-  // Make sure totals section doesn't overflow
   if(y+30>270){doc.addPage();y=20;}
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
-  doc.text('Subtotal',138,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
-  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',85,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
+  doc.text('Subtotal',130,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
+  if(pct>0){doc.setFontSize(9);doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',60,y);doc.setFontSize(10);doc.setTextColor(0);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;}
   doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
   doc.setFont('helvetica','bold');doc.setFontSize(13);
-  doc.text('TOTAL',138,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
+  doc.text('TOTAL',130,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
   y+=14;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);
   doc.text('Payment Details:',20,y);y+=5;
   doc.text('All payment must be made payable to Halo Optical (M) Sdn Bhd (HLB A/C: 33000051915).',20,y);
