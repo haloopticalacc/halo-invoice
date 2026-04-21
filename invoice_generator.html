@@ -31,10 +31,11 @@ textarea{resize:vertical;}
 .tabs{display:flex;gap:4px;margin-bottom:14px;}
 .tab{padding:6px 16px;font-size:13px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;background:#f5f5f5;color:#666;}
 .tab.active{background:#fff;color:#1a1a1a;border-color:#bbb;font-weight:500;}
-.item-header{display:grid;grid-template-columns:2fr 1.4fr 1.2fr 1fr 28px;gap:8px;margin-bottom:6px;padding:0 2px;}
+.item-header{display:grid;grid-template-columns:1.5fr 1.5fr 1.4fr 1fr 0.8fr 0.8fr 28px;gap:8px;margin-bottom:6px;padding:0 2px;}
 .item-header span{font-size:11px;color:#888;}
-.item-row{display:grid;grid-template-columns:2fr 1.4fr 1.2fr 1fr 28px;gap:8px;align-items:center;margin-bottom:8px;}
+.item-row{display:grid;grid-template-columns:1.5fr 1.5fr 1.4fr 1fr 0.8fr 0.8fr 28px;gap:8px;align-items:center;margin-bottom:8px;}
 .item-row input,.item-row select{font-size:13px;padding:6px 8px;}
+.custom-cat{display:none;}
 .del-btn{background:none;border:none;cursor:pointer;color:#e53935;font-size:18px;padding:0;line-height:1;}
 .add-row-btn{font-size:13px;color:#1565c0;background:none;border:1px dashed #90caf9;border-radius:8px;padding:7px 12px;cursor:pointer;width:100%;margin-top:6px;}
 .add-row-btn:hover{background:#e8f3fc;}
@@ -140,7 +141,7 @@ tr:hover td{background:#fafafa;}
       </div>
 
       <div id="manualTab">
-        <div class="item-header"><span>Invoice no</span><span>Category</span><span>Ref no(s)</span><span>Amount (RM)</span><span></span></div>
+        <div class="item-header"><span>Invoice ref no</span><span>Receive order no</span><span>Category</span><span>Bill ref no</span><span>Qty</span><span>Amount (RM)</span><span></span></div>
         <div id="itemRows"></div>
         <button class="add-row-btn" onclick="addRow()">+ Add line</button>
       </div>
@@ -176,7 +177,7 @@ tr:hover td{background:#fafafa;}
       <div class="total-block">
         <div class="total-line"><span style="color:#888;">Subtotal</span><span class="total-val" id="subtotal">RM 0.00</span></div>
         <div class="total-line">
-          <span style="color:#888;">Markup
+          <span style="color:#888;">Management fee
             <select id="markupPct" onchange="recalc()" style="display:inline;width:auto;font-size:12px;padding:2px 6px;margin-left:6px;">
               <option value="0">0%</option><option value="10" selected>+10%</option><option value="15">+15%</option><option value="20">+20%</option>
             </select>
@@ -225,7 +226,6 @@ let branches=[
   {id:'kulai',name:'Halo Optical Kulai PLT',addr:'NO. 192, PUSAT KOMERSIAL INDAH, JALAN KIAMBANG 12,\nBANDAR INDAHPURA, 81000 KULAI, JOHOR',email:'haloopticalkulai@gmail.com'},
   {id:'kepong',name:'Halo Optical (Kepong) Sdn Bhd',addr:'A-12-1, Jalan Rimbunan Teratai 1, Desa Kepong,\nKepong, 52100, Kuala Lumpur',email:''}
 ];
-const categories=['Lens','Frame','Sunglasses','Accessories','Other'];
 
 (function(){
   const hash=window.location.hash;
@@ -239,7 +239,7 @@ const categories=['Lens','Frame','Sunglasses','Accessories','Other'];
 window.addEventListener('DOMContentLoaded',function(){
   document.getElementById('invDate').value=new Date().toISOString().split('T')[0];
   renderBranchSelect();
-  addRow('','Lens','','');
+  addRow();
   if(accessToken)initApp(true);
 });
 
@@ -280,26 +280,43 @@ function switchTab(tab,el){
   document.getElementById('manualTab').style.display=tab==='manual'?'':'none';
   document.getElementById('uploadTab').style.display=tab==='upload'?'':'none';
 }
-function addRow(invNo='',cat='Lens',ref='',amt=''){
-  items.push({id:Date.now()+Math.random(),invNo,cat,ref,amt});renderRows();
+const categories=['Lens','Frame','Sunglasses','Accessories','Other'];
+function addRow(invRefNo='',orderNo='',cat='Lens',customCat='',billRef='',qty='1',amt=''){
+  items.push({id:Date.now()+Math.random(),invRefNo,orderNo,cat,customCat,billRef,qty,amt});renderRows();
 }
 function renderRows(){
   const c=document.getElementById('itemRows');c.innerHTML='';
   items.forEach((item,i)=>{
-    const d=document.createElement('div');d.className='item-row';
+    const isCustom=item.cat==='Other (custom)';
+    const d=document.createElement('div');
+    d.style.marginBottom='8px';
     d.innerHTML=`
-      <input value="${item.invNo}" placeholder="IV2503/001853" onchange="items[${i}].invNo=this.value"/>
-      <select onchange="items[${i}].cat=this.value;recalc()">${categories.map(c=>`<option ${c===item.cat?'selected':''}>${c}</option>`).join('')}</select>
-      <input value="${item.ref}" placeholder="00660" onchange="items[${i}].ref=this.value"/>
-      <input type="number" value="${item.amt}" placeholder="0.00" onchange="items[${i}].amt=this.value;recalc()"/>
-      <button class="del-btn" onclick="items.splice(${i},1);renderRows()">×</button>`;
+      <div class="item-row">
+        <input value="${item.invRefNo||''}" placeholder="INV ref no" onchange="items[${i}].invRefNo=this.value"/>
+        <input value="${item.orderNo||''}" placeholder="Receive order no" onchange="items[${i}].orderNo=this.value"/>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <select onchange="items[${i}].cat=this.value;renderRows()">
+            ${[...categories,'Other (custom)'].map(c=>`<option ${c===item.cat?'selected':''}>${c}</option>`).join('')}
+          </select>
+          ${isCustom?`<input value="${item.customCat||''}" placeholder="Type category..." onchange="items[${i}].customCat=this.value" style="font-size:12px;padding:4px 8px;"/>`:''}
+        </div>
+        <input value="${item.billRef||''}" placeholder="Bill ref no" onchange="items[${i}].billRef=this.value"/>
+        <input type="number" value="${item.qty||1}" placeholder="1" min="1" onchange="items[${i}].qty=this.value;recalc()"/>
+        <input type="number" value="${item.amt||''}" placeholder="0.00" onchange="items[${i}].amt=this.value;recalc()"/>
+        <button class="del-btn" onclick="items.splice(${i},1);renderRows()">×</button>
+      </div>`;
     c.appendChild(d);
   });
   recalc();
 }
 function recalc(){
   const byCategory={};let subtotal=0;
-  items.forEach(item=>{const a=parseFloat(item.amt)||0;if(!byCategory[item.cat])byCategory[item.cat]=0;byCategory[item.cat]+=a;subtotal+=a;});
+  items.forEach(item=>{
+    const a=(parseFloat(item.amt)||0)*(parseFloat(item.qty)||1);
+    const dispCat=item.cat==='Other (custom)'?(item.customCat||'Other'):item.cat;
+    if(!byCategory[dispCat])byCategory[dispCat]=0;
+    byCategory[dispCat]+=a;subtotal+=a;
+  });
   const pct=parseFloat(document.getElementById('markupPct').value)||0;
   const markup=subtotal*pct/100;const grand=subtotal+markup;
   document.getElementById('subtotal').textContent='RM '+subtotal.toFixed(2);
@@ -308,7 +325,7 @@ function recalc(){
   const st=document.getElementById('summaryTable');
   if(!Object.keys(byCategory).length){st.innerHTML='<div style="color:#999;text-align:center;padding:1rem;font-size:13px;">No items added yet</div>';return;}
   st.innerHTML=Object.entries(byCategory).map(([cat,amt])=>`
-    <div class="summary-row"><span><span class="badge badge-${cat}">${cat}</span><span style="font-size:12px;color:#888;">${items.filter(i=>i.cat===cat).length} line(s)</span></span><span style="font-weight:500;">RM ${amt.toFixed(2)}</span></div>`).join('');
+    <div class="summary-row"><span><span class="badge badge-${cat.replace(/\s+/g,'-')}">${cat}</span><span style="font-size:12px;color:#888;">${items.filter(i=>(i.cat==='Other (custom)'?i.customCat||'Other':i.cat)===cat).length} line(s)</span></span><span style="font-weight:500;">RM ${amt.toFixed(2)}</span></div>`).join('');
 }
 
 function handleFileUpload(e){const f=e.target.files[0];if(f)processFile(f);}
@@ -423,9 +440,13 @@ function buildPDF(){
   const supplier=document.getElementById('supplier').value;
   const period=document.getElementById('period').value;
   const pct=parseFloat(document.getElementById('markupPct').value)||0;
-  const subtotal=items.reduce((s,i)=>s+(parseFloat(i.amt)||0),0);
+  const subtotal=items.reduce((s,i)=>s+(parseFloat(i.amt)||0)*(parseFloat(i.qty)||1),0);
   const markup=subtotal*pct/100;const grand=subtotal+markup;
-  const byCategory={};items.forEach(item=>{if(!byCategory[item.cat])byCategory[item.cat]=[];byCategory[item.cat].push(item);});
+  const byCategory={};
+  items.forEach(item=>{
+    const dispCat=item.cat==='Other (custom)'?(item.customCat||'Other'):item.cat;
+    if(!byCategory[dispCat])byCategory[dispCat]=[];byCategory[dispCat].push(item);
+  });
 
   doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(0);
   doc.text('HALO OPTICAL (M) SDN BHD (1467170-P)',20,20);
@@ -448,25 +469,35 @@ function buildPDF(){
   if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,72+addrLines.length*5+(branch.email?6:0));}
   let y=95;
   doc.setFillColor(240,240,240);doc.rect(20,y,170,7,'F');
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0);
-  doc.text('Invoice No',22,y+5);doc.text('Category',74,y+5);doc.text('Ref No(s)',108,y+5);doc.text('Amount (RM)',185,y+5,{align:'right'});
-  y+=11;doc.setFont('helvetica','normal');doc.setFontSize(9);
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0);
+  doc.text('Invoice Ref No',22,y+5);
+  doc.text('Receive Order No',55,y+5);
+  doc.text('Category',92,y+5);
+  doc.text('Bill Ref No',118,y+5);
+  doc.text('Qty',148,y+5);
+  doc.text('Amount (RM)',185,y+5,{align:'right'});
+  y+=11;doc.setFont('helvetica','normal');doc.setFontSize(8);
   Object.entries(byCategory).forEach(([cat,catItems])=>{
     doc.setFont('helvetica','bold');doc.setTextColor(80);doc.text(cat.toUpperCase(),22,y);y+=5;
     doc.setFont('helvetica','normal');doc.setTextColor(0);
     catItems.forEach(item=>{
-      const refs=item.ref?(item.ref.length>35?item.ref.substring(0,35)+'...':item.ref):'-';
-      doc.text(String(item.invNo||'-'),22,y);doc.text(cat,74,y);doc.text(refs,108,y);
-      doc.text('RM '+(parseFloat(item.amt||0).toFixed(2)),185,y,{align:'right'});
+      const qty=parseFloat(item.qty)||1;
+      const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
+      doc.text(String(item.invRefNo||'-').substring(0,18),22,y);
+      doc.text(String(item.orderNo||'-').substring(0,18),55,y);
+      doc.text(cat.substring(0,14),92,y);
+      doc.text(String(item.billRef||'-').substring(0,14),118,y);
+      doc.text(String(qty),148,y);
+      doc.text('RM '+lineTotal,185,y,{align:'right'});
       y+=5;if(y>255){doc.addPage();y=20;}
     });
-    const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt)||0),0);
-    doc.setTextColor(120);doc.text('Subtotal — '+cat,108,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
+    const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)),0);
+    doc.setTextColor(120);doc.text('Subtotal — '+cat,118,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
     doc.setTextColor(0);y+=7;doc.setDrawColor(210);doc.line(20,y,190,y);y+=5;
   });
   y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
   doc.text('Subtotal',138,y);doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
-  if(pct>0){doc.setTextColor(100);doc.text('Markup ('+pct+'%)',138,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
+  if(pct>0){doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',138,y);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;doc.setTextColor(0);}
   doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
   doc.setFont('helvetica','bold');doc.setFontSize(13);
   doc.text('TOTAL',138,y);doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
