@@ -357,10 +357,6 @@ function processFile(file){
         document.getElementById('uploadStatus').textContent='Error reading file: '+err.message;
       }
     };
-      }catch(err){
-        document.getElementById('uploadStatus').textContent='Error reading file: '+err.message;
-      }
-    };
     reader.readAsArrayBuffer(file);
   }
 }
@@ -431,6 +427,8 @@ function parseXLSXObjects(data){
   if(!rows.length){document.getElementById('uploadStatus').textContent='No valid data rows found.';return;}
   showPreview(rows);
 }
+
+function parseCSV(data){
   const rows=[];
   data.forEach(row=>{
     const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
