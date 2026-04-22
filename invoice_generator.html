@@ -770,18 +770,19 @@ function fBuildPDF(){
   doc.text('14100, Simpang Ampat, Penang.',20,45);
   doc.text('Tel: 017 494 0266  |  halooptical.acc@gmail.com',20,49);
   doc.setFontSize(10);
-  doc.setTextColor(100);doc.text('Invoice No:',138,41);doc.setTextColor(0);doc.text(invNo,190,41,{align:'right'});
-  doc.setTextColor(100);doc.text('Date:',138,45);doc.setTextColor(0);doc.text(invDate,190,45,{align:'right'});
-  doc.setTextColor(100);doc.text('Due Date:',138,49);doc.setFont('helvetica','bold');doc.text(dueDate,190,49,{align:'right'});
+  doc.setTextColor(100);doc.text('Invoice No:',138,38);doc.setTextColor(0);doc.text(invNo,190,38,{align:'right'});
+  doc.setTextColor(100);doc.text('Date:',138,43);doc.setTextColor(0);doc.text(invDate,190,43,{align:'right'});
+  doc.setTextColor(100);doc.text('Due Date:',138,48);doc.setFont('helvetica','bold');doc.text(dueDate,190,48,{align:'right'});
   if(period){doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Period:',138,53);doc.setTextColor(0);doc.text(period,190,53,{align:'right'});}
-  doc.setDrawColor(200);doc.line(20,55,190,55);
-  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text('BILL TO:',20,60);
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text(branch.name,20,66);
+  doc.setDrawColor(200);doc.line(20,period?58:53,190,period?58:53);
+  const billToY=period?63:58;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text('BILL TO:',20,billToY);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text(branch.name,20,billToY+6);
   doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
   const addrLines=(branch.addr||'').split('\n');
-  addrLines.forEach((l,i)=>doc.text(l,20,72+i*5));
-  if(branch.email)doc.text(branch.email,20,72+addrLines.length*5);
-  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,72+addrLines.length*5+(branch.email?6:0));}
+  addrLines.forEach((l,i)=>doc.text(l,20,billToY+12+i*5));
+  if(branch.email)doc.text(branch.email,20,billToY+12+addrLines.length*5);
+  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,billToY+12+addrLines.length*5+(branch.email?6:0));}
 
   // Table header
   let y=95;
