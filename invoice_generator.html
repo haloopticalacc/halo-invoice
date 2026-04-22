@@ -104,7 +104,8 @@ tr:hover td{background:#fafafa;}
 <div id="mainApp" style="display:none;">
   <div class="top-bar">
     <div class="nav">
-      <button class="nav-btn active" onclick="showPage('create',this)">New invoice</button>
+      <button class="nav-btn active" onclick="showPage('create',this)">Lens invoice</button>
+      <button class="nav-btn" onclick="showPage('frame',this)">Frame &amp; Accessories</button>
       <button class="nav-btn" onclick="showPage('history',this)">History</button>
     </div>
     <div id="userChip"></div>
@@ -191,6 +192,63 @@ tr:hover td{background:#fafafa;}
     <button class="generate-btn secondary" onclick="generatePDFOnly()">Generate PDF only (no save)</button>
   </div>
 
+  <!-- FRAME & ACCESSORIES PAGE -->
+  <div id="page-frame" class="page">
+    <div class="section">
+      <div class="section-title">Invoice details</div>
+      <div class="row">
+        <div class="field"><label>Invoice no</label><input id="fInvNo" value="INV25-HML056"/></div>
+        <div class="field"><label>Date</label><input id="fInvDate" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Bill to (branch)</label>
+          <div class="branch-row">
+            <select id="fBranch"></select>
+          </div>
+        </div>
+        <div class="field"><label>Supplier</label><input id="fSupplier" placeholder="e.g. Luxottica"/></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Period</label><input id="fPeriod" placeholder="e.g. March 2025"/></div>
+        <div class="field"><label>Due date</label><input id="fDueDate" value="1 Week"/></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Items</div>
+      <div class="item-header" style="display:grid;grid-template-columns:2.5fr 1.5fr 0.8fr 1fr 28px;gap:8px;margin-bottom:6px;padding:0 2px;">
+        <span style="font-size:11px;color:#888;">Description</span>
+        <span style="font-size:11px;color:#888;">Category</span>
+        <span style="font-size:11px;color:#888;">Qty</span>
+        <span style="font-size:11px;color:#888;">Amount (RM)</span>
+        <span></span>
+      </div>
+      <div id="fItemRows"></div>
+      <button class="add-row-btn" onclick="fAddRow()">+ Add line</button>
+    </div>
+    <div class="section">
+      <div class="section-title">Summary</div>
+      <div id="fSummaryTable"><div style="color:#999;text-align:center;padding:1rem;font-size:13px;">No items added yet</div></div>
+      <div class="total-block">
+        <div class="total-line"><span style="color:#888;">Subtotal</span><span class="total-val" id="fSubtotal">RM 0.00</span></div>
+        <div class="total-line">
+          <span style="color:#888;">Management fee
+            <select id="fMarkupPct" onchange="fRecalc()" style="display:inline;width:auto;font-size:12px;padding:2px 6px;margin-left:6px;">
+              <option value="0">0%</option>
+              <option value="10" selected>+10%</option>
+              <option value="15">+15%</option>
+              <option value="20">+20%</option>
+            </select>
+          </span>
+          <span class="total-val" id="fMarkupAmt">RM 0.00</span>
+        </div>
+        <div class="total-line grand"><span>Total</span><span class="total-val" id="fGrandTotal">RM 0.00</span></div>
+      </div>
+    </div>
+    <button class="generate-btn" onclick="fGenerateInvoice()">Generate PDF &amp; Save to Sheets</button>
+    <button class="generate-btn secondary" onclick="fGeneratePDFOnly()">Generate PDF only (no save)</button>
+  </div>
+
   <div id="page-history" class="page">
     <div class="section">
       <div class="section-title">Invoice history</div>
@@ -263,6 +321,8 @@ function showPage(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   if(page==='history')loadHistory();
+  if(page==='frame'){fInitBranch();if(!fItems.length)fAddRow();}
+  document.getElementById('fInvDate').value=document.getElementById('fInvDate').value||new Date().toISOString().split('T')[0];
 }
 function renderBranchSelect(){
   const s=document.getElementById('branch');if(!s)return;
@@ -620,6 +680,181 @@ function filterHistory(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   if(!q){renderHistory(allHistory);return;}
   renderHistory(allHistory.filter(r=>r.join(' ').toLowerCase().includes(q)));
+}
+
+// ===== FRAME & ACCESSORIES =====
+const fCategories=['Frame','Accessories','Other (custom)'];
+let fItems=[];
+
+function fInitBranch(){
+  const sel=document.getElementById('fBranch');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML=branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if(cur)sel.value=cur;
+}
+
+function fAddRow(desc='',cat='Frame',customCat='',qty='1',amt=''){
+  fItems.push({id:Date.now()+Math.random(),desc,cat,customCat,qty,amt});
+  fRenderRows();
+}
+
+function fRenderRows(){
+  const c=document.getElementById('fItemRows');c.innerHTML='';
+  fItems.forEach((item,i)=>{
+    const isCustom=item.cat==='Other (custom)';
+    const d=document.createElement('div');
+    d.style.marginBottom='8px';
+    d.innerHTML=`<div style="display:grid;grid-template-columns:2.5fr 1.5fr 0.8fr 1fr 28px;gap:8px;align-items:center;">
+      <input value="${item.desc||''}" placeholder="e.g. Ray-Ban RB3025" onchange="fItems[${i}].desc=this.value"/>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <select onchange="fItems[${i}].cat=this.value;fRenderRows()">
+          ${fCategories.map(c=>`<option ${c===item.cat?'selected':''}>${c}</option>`).join('')}
+        </select>
+        ${isCustom?`<input value="${item.customCat||''}" placeholder="Type category..." onchange="fItems[${i}].customCat=this.value" style="font-size:12px;padding:4px 8px;"/>`:''}
+      </div>
+      <input type="number" value="${item.qty||1}" min="1" onchange="fItems[${i}].qty=this.value;fRecalc()"/>
+      <input type="number" value="${item.amt||''}" placeholder="0.00" onchange="fItems[${i}].amt=this.value;fRecalc()"/>
+      <button class="del-btn" onclick="fItems.splice(${i},1);fRenderRows()">×</button>
+    </div>`;
+    c.appendChild(d);
+  });
+  fRecalc();
+}
+
+function fRecalc(){
+  const byCategory={};let subtotal=0;
+  fItems.forEach(item=>{
+    const a=(parseFloat(item.amt)||0)*(parseFloat(item.qty)||1);
+    const cat=item.cat==='Other (custom)'?(item.customCat||'Other'):item.cat;
+    if(!byCategory[cat])byCategory[cat]=0;
+    byCategory[cat]+=a;subtotal+=a;
+  });
+  const pct=parseFloat(document.getElementById('fMarkupPct').value)||0;
+  const markup=subtotal*pct/100;const grand=subtotal+markup;
+  document.getElementById('fSubtotal').textContent='RM '+subtotal.toFixed(2);
+  document.getElementById('fMarkupAmt').textContent='RM '+markup.toFixed(2);
+  document.getElementById('fGrandTotal').textContent='RM '+grand.toFixed(2);
+  const st=document.getElementById('fSummaryTable');
+  if(!Object.keys(byCategory).length){st.innerHTML='<div style="color:#999;text-align:center;padding:1rem;font-size:13px;">No items added yet</div>';return;}
+  st.innerHTML=Object.entries(byCategory).map(([cat,amt])=>`
+    <div class="summary-row"><span><span class="badge badge-${cat.replace(/\s+/g,'-')}">${cat}</span><span style="font-size:12px;color:#888;">${fItems.filter(i=>(i.cat==='Other (custom)'?i.customCat||'Other':i.cat)===cat).length} line(s)</span></span><span style="font-weight:500;">RM ${amt.toFixed(2)}</span></div>`).join('');
+}
+
+function fBuildPDF(){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const branchId=document.getElementById('fBranch').value;
+  const branch=branches.find(b=>b.id===branchId)||branches[0];
+  const invNo=document.getElementById('fInvNo').value;
+  const invDate=document.getElementById('fInvDate').value;
+  const dueDate=document.getElementById('fDueDate').value;
+  const supplier=document.getElementById('fSupplier').value;
+  const period=document.getElementById('fPeriod').value;
+  const pct=parseFloat(document.getElementById('fMarkupPct').value)||0;
+  const subtotal=fItems.reduce((s,i)=>s+(parseFloat(i.amt)||0)*(parseFloat(i.qty)||1),0);
+  const markup=subtotal*pct/100;const grand=subtotal+markup;
+  const byCategory={};
+  fItems.forEach(item=>{
+    const cat=item.cat==='Other (custom)'?(item.customCat||'Other'):item.cat;
+    if(!byCategory[cat])byCategory[cat]=[];byCategory[cat].push(item);
+  });
+
+  // Header
+  try{doc.addImage(LOGO_B64,'JPEG',65,4,80,20);}catch(e){}
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(0);
+  doc.text('HALO OPTICAL (M) SDN BHD (1467170-P)',20,35);
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text('INVOICE',190,35,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(100);
+  doc.text('No. 12, Jalan Perniagaan Seri Juru 1, Pusat Perniagaan Seri Juru,',20,41);
+  doc.text('14100, Simpang Ampat, Penang.',20,45);
+  doc.text('Tel: 017 494 0266  |  halooptical.acc@gmail.com',20,49);
+  doc.setFontSize(10);
+  doc.setTextColor(100);doc.text('Invoice No:',138,41);doc.setTextColor(0);doc.text(invNo,190,41,{align:'right'});
+  doc.setTextColor(100);doc.text('Date:',138,45);doc.setTextColor(0);doc.text(invDate,190,45,{align:'right'});
+  doc.setTextColor(100);doc.text('Due Date:',138,49);doc.setFont('helvetica','bold');doc.text(dueDate,190,49,{align:'right'});
+  if(period){doc.setFont('helvetica','normal');doc.setTextColor(100);doc.text('Period:',138,53);doc.setTextColor(0);doc.text(period,190,53,{align:'right'});}
+  doc.setDrawColor(200);doc.line(20,55,190,55);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text('BILL TO:',20,60);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text(branch.name,20,66);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
+  const addrLines=(branch.addr||'').split('\n');
+  addrLines.forEach((l,i)=>doc.text(l,20,72+i*5));
+  if(branch.email)doc.text(branch.email,20,72+addrLines.length*5);
+  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,72+addrLines.length*5+(branch.email?6:0));}
+
+  // Table header
+  let y=95;
+  doc.setFillColor(240,240,240);doc.rect(20,y,170,7,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0);
+  doc.text('Description',22,y+5);
+  doc.text('Category',100,y+5);
+  doc.text('Qty',148,y+5);
+  doc.text('Amount (RM)',185,y+5,{align:'right'});
+  y+=11;doc.setFont('helvetica','normal');doc.setFontSize(8);
+
+  Object.entries(byCategory).forEach(([cat,catItems])=>{
+    doc.setFont('helvetica','bold');doc.setTextColor(80);doc.text(cat.toUpperCase(),22,y);y+=5;
+    doc.setFont('helvetica','normal');doc.setTextColor(0);
+    catItems.forEach(item=>{
+      const qty=parseFloat(item.qty)||1;
+      const lineTotal=(parseFloat(item.amt||0)*qty).toFixed(2);
+      const descLines=[];
+      const desc=String(item.desc||'-');
+      for(let s=0;s<desc.length;s+=35)descLines.push(desc.substring(s,s+35));
+      if(!descLines.length)descLines.push('-');
+      const rowH=Math.max(5,descLines.length*4+2);
+      if(y+rowH>255){doc.addPage();y=20;}
+      descLines.forEach((line,li)=>doc.text(line,22,y+li*4));
+      doc.text(cat,100,y);
+      doc.text(String(qty),148,y);
+      doc.text('RM '+lineTotal,185,y,{align:'right'});
+      y+=rowH;
+    });
+    const catTotal=catItems.reduce((s,i)=>s+(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)),0);
+    if(y+12>270){doc.addPage();y=20;}
+    doc.setTextColor(120);doc.text('Subtotal — '+cat,100,y);doc.text('RM '+catTotal.toFixed(2),185,y,{align:'right'});
+    doc.setTextColor(0);y+=7;doc.setDrawColor(210);doc.line(20,y,190,y);y+=5;
+  });
+
+  if(y+30>270){doc.addPage();y=20;}
+  y+=3;doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(0);
+  doc.text('Subtotal',155,y,{align:'right'});doc.text('RM '+subtotal.toFixed(2),190,y,{align:'right'});y+=6;
+  if(pct>0){doc.setFontSize(9);doc.setTextColor(100);doc.text('Management fee ('+pct+'%)',155,y,{align:'right'});doc.setFontSize(10);doc.setTextColor(0);doc.text('RM '+markup.toFixed(2),190,y,{align:'right'});y+=6;}
+  doc.setDrawColor(0);doc.line(130,y,190,y);y+=5;
+  doc.setFont('helvetica','bold');doc.setFontSize(13);
+  doc.text('TOTAL',155,y,{align:'right'});doc.text('RM '+grand.toFixed(2),190,y,{align:'right'});
+  y+=14;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);
+  doc.text('Payment Details:',20,y);y+=5;
+  doc.text('All payment must be made payable to Halo Optical (M) Sdn Bhd (HLB A/C: 33000051915).',20,y);
+  return{doc,invNo,branch,supplier,period,grand,pct};
+}
+
+function fGeneratePDFOnly(){
+  if(!fItems.length){alert('Please add at least one line.');return;}
+  const{doc,invNo,branch}=fBuildPDF();
+  doc.save('Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf');
+}
+
+async function fGenerateInvoice(){
+  if(!fItems.length){alert('Please add at least one line.');return;}
+  const{doc,invNo,branch,supplier,period,grand}=fBuildPDF();
+  doc.save('Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf');
+  if(!accessToken){showStatus('PDF downloaded. Sign in to also save to Sheets.','info');return;}
+  showStatus('Saving to Google Sheets...','info');
+  const now=new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur'});
+  const itemsSummary=fItems.map(i=>`${i.desc||'-'}(${i.cat==='Other (custom)'?i.customCat||'Other':i.cat}):RM${(parseFloat(i.amt||0)*(parseFloat(i.qty)||1)).toFixed(2)}`).join(' | ');
+  const row=[invNo,document.getElementById('fInvDate').value,branch.name,supplier,period,itemsSummary,'RM '+grand.toFixed(2),now];
+  try{
+    const checkRes=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A1:H1`,{headers:{Authorization:'Bearer '+accessToken}});
+    const checkData=await checkRes.json();
+    if(!checkData.values||!checkData.values.length){
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A1:H1?valueInputOption=RAW`,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:[['Invoice No','Date','Branch','Supplier','Period','Items','Total (RM)','Created At']]})});
+    }
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A:H:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({values:[row]})});
+    if(res.ok)showStatus('Invoice saved to Google Sheets!','success');
+    else{const err=await res.json();showStatus('Sheets error: '+err.error.message,'error');}
+  }catch(e){showStatus('Failed: '+e.message,'error');}
 }
 </script>
 </body>
