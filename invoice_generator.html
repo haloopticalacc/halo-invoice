@@ -400,20 +400,28 @@ function processFile(file){
     const reader=new FileReader();
     reader.onload=e=>{
       try{
-        const wb=XLSX.read(e.target.result,{type:'array'});
+        // Support both .xls and .xlsx
+        const wb=XLSX.read(e.target.result,{type:'array',cellDates:true,cellNF:false,cellText:false});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        // Find header row first, then parse from there
-        const rawArr=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-        // Find header row index
+        // Get raw array to find header row
+        const rawArr=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+        // Find header row - look for any of the known column names
+        const knownCols=['Received Order No','Received Order No.','Invoice No','Invoice Date','Received Date','Remarks','Unit Price','Grand Total','Quantity'];
         let headerIdx=-1;
         for(let i=0;i<rawArr.length;i++){
           const row=rawArr[i];
-          if(row&&row.some(c=>String(c||'').trim()==='Received Order No')){headerIdx=i;break;}
+          if(!row)continue;
+          const matches=row.filter(c=>knownCols.includes(String(c||'').trim())).length;
+          if(matches>=2){headerIdx=i;break;}
         }
-        if(headerIdx===-1){document.getElementById('uploadStatus').textContent='Cannot find "Received Order No" column.';return;}
-        // Re-read from header row onwards as objects
-        const dataRows=XLSX.utils.sheet_to_json(ws,{header:rawArr[headerIdx].map(c=>String(c||'').trim()),defval:'',range:headerIdx});
-        parseXLSXObjects(dataRows.slice(1)); // skip header row itself
+        if(headerIdx===-1){
+          document.getElementById('uploadStatus').textContent='Cannot find header row. Please check the file has columns like "Received Order No.", "Unit Price", "Remarks".';
+          return;
+        }
+        // Re-read as objects using header row
+        const headers=rawArr[headerIdx].map(c=>String(c||'').trim());
+        const dataRows=XLSX.utils.sheet_to_json(ws,{header:headers,defval:'',range:headerIdx,raw:false});
+        parseXLSXObjects(dataRows.slice(1));
       }catch(err){
         document.getElementById('uploadStatus').textContent='Error reading file: '+err.message;
       }
@@ -439,14 +447,15 @@ function parseXLSX(raw){
   let headerIdx=-1,headers=[];
   for(let i=0;i<raw.length;i++){
     const row=raw[i].map(c=>String(c||'').trim());
-    if(row.some(c=>c==='Received Order No'||c==='Invoice No')){headerIdx=i;headers=row;break;}
+    if(row.some(c=>['Received Order No','Received Order No.','Invoice No'].includes(c))){headerIdx=i;headers=row;break;}
   }
   if(headerIdx===-1){document.getElementById('uploadStatus').textContent='Cannot find header row. Make sure file has "Received Order No" column.';return;}
 
-  const dateCol=headers.findIndex(h=>h==='Invoice Date'||h==='Date');
-  const orderCol=headers.findIndex(h=>h==='Received Order No'||h==='Invoice No');
-  const amtCol=headers.findIndex(h=>h==='Grand Total'||h==='Balance Amount'||h==='Sub Total');
-  const refCol=headers.findIndex(h=>h==='Remarks'||h==='Ref No');
+  const dateCol=headers.findIndex(h=>['Invoice Date','Received Date','Date'].includes(h));
+  const orderCol=headers.findIndex(h=>['Received Order No','Received Order No.','Invoice No'].includes(h));
+  const amtCol=headers.findIndex(h=>['Grand Total','Balance Amount','Sub Total','Unit Price','Amount'].includes(h));
+  const refCol=headers.findIndex(h=>['Remarks','Ref No','Remark'].includes(h));
+  const qtyCol=headers.findIndex(h=>['Quantity','Qty','QTY'].includes(h));
 
   const rows=[];
   for(let i=headerIdx+1;i<raw.length;i++){
@@ -455,9 +464,10 @@ function parseXLSX(raw){
     const invDate=formatExcelDate(row[dateCol]);
     const amt=parseFloat(row[amtCol])||0;
     const ref=String(row[refCol]||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
+    const qty=qtyCol>=0?String(parseFloat(row[qtyCol])||1):'1';
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<100))continue;
     if(amt===0&&!orderNo)continue;
-    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
+    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty});
   }
   if(!rows.length){document.getElementById('uploadStatus').textContent='No valid data rows found.';return;}
   showPreview(rows);
@@ -467,8 +477,8 @@ function parseXLSXObjects(data){
   // data is array of objects with keys matching header names
   const rows=[];
   data.forEach(row=>{
-    const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
-    const rawDate=row['Invoice Date']||row['Date']||'';
+    const orderNo=String(row['Received Order No']||row['Received Order No.']||row['Invoice No']||'').trim();
+    const rawDate=row['Invoice Date']||row['Received Date']||row['Date']||'';
     let invDate='';
     if(rawDate instanceof Date){
       invDate=rawDate.toISOString().split('T')[0];
@@ -478,11 +488,12 @@ function parseXLSXObjects(data){
     } else {
       invDate=String(rawDate).trim();
     }
-    const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||0);
+    const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Sub Total']||row['Unit Price']||row['Amount']||0);
     const ref=String(row['Remarks']||row['Ref No']||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
+    const qty=String(parseFloat(row['Quantity']||row['Qty']||row['QTY']||1)||1);
     if(!orderNo||(!isNaN(Number(orderNo))&&Number(orderNo)<1000))return;
     if(amt===0&&!orderNo)return;
-    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty:'1'});
+    rows.push({invRefNo:invDate,orderNo,billRef:ref,amt:amt.toFixed(2),qty});
   });
   if(!rows.length){document.getElementById('uploadStatus').textContent='No valid data rows found.';return;}
   showPreview(rows);
@@ -491,7 +502,7 @@ function parseXLSXObjects(data){
 function parseCSV(data){
   const rows=[];
   data.forEach(row=>{
-    const orderNo=String(row['Received Order No']||row['Invoice No']||'').trim();
+    const orderNo=String(row['Received Order No']||row['Received Order No.']||row['Invoice No']||'').trim();
     const invDate=String(row['Invoice Date']||row['Date']||'').trim();
     const amt=parseFloat(row['Grand Total']||row['Balance Amount']||row['Amount']||0);
     const ref=String(row['Remarks']||row['Ref No']||'').replace(/\n/g,' / ').replace(/\r/g,'').trim();
