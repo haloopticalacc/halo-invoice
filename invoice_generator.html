@@ -360,11 +360,12 @@ async function loadLatestInvoiceNos(){
     for(let i=rows.length-1;i>=0;i--){
       const invNo=rows[i][0];const items=rows[i][5]||'';
       if(!invNo)continue;
-      // Heuristic: if items contain Lens, it's a lens invoice; if Frame/Accessories, it's other
       const hasLens=/\(Lens\)/i.test(items);
-      const hasOther=/\(Frame\)|\(Accessories\)|\(Other\)/i.test(items);
-      if(hasLens&&!latestLens)latestLens=invNo;
-      if(hasOther&&!latestOther)latestOther=invNo;
+      if(hasLens){
+        if(!latestLens)latestLens=invNo;
+      } else {
+        if(!latestOther)latestOther=invNo;
+      }
       if(latestLens&&latestOther)break;
     }
     if(latestLens)document.getElementById('invNo').value=latestLens;
