@@ -356,12 +356,15 @@ async function loadLatestInvoiceNos(){
     const rows=data.values.slice(1);
     // Detect Lens vs Other from items column (col 5): Lens has items like "I526xxx(Lens):RM..." 
     // Other has items like "Description(Frame/Accessories):RM..."
-    // Find latest invoice no for each tab based on prefix
-    // Lens: contains "HML" (e.g. INV25-HML055)
-    // Other: anything else
+    // Sort rows by date column (B) descending to find latest by date
+    // Date format: YYYY-MM-DD
+    const sortedRows=[...rows].sort((a,b)=>{
+      const da=(a[1]||'').toString();const db=(b[1]||'').toString();
+      return db.localeCompare(da);
+    });
     let latestLens=null,latestOther=null;
-    for(let i=rows.length-1;i>=0;i--){
-      const invNo=rows[i][0];
+    for(let i=0;i<sortedRows.length;i++){
+      const invNo=sortedRows[i][0];
       if(!invNo)continue;
       const isLens=/HML/i.test(invNo);
       if(isLens){
@@ -801,11 +804,14 @@ async function generateInvoice(){
   if(!items.length){alert('Please add at least one line.');return;}
   const{doc,invNo,branch,supplier,period,grand}=buildPDF();
   const filename='Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf';
-  doc.save(filename);
-  try{localStorage.setItem('lastInvNo_lens',invNo);}catch(e){}
-  if(!accessToken){showStatus('PDF downloaded. Sign in to save to Google Sheets & Drive.','info');return;}
+  if(!accessToken){
+    // Not signed in — fall back to download
+    doc.save(filename);
+    showStatus('PDF downloaded. Sign in to save to Google Sheets & Drive.','info');
+    return;
+  }
   showStatus('Saving to Google Sheets & Drive...','info');
-  // Upload PDF to Drive
+  // Upload PDF to Drive (no local download)
   const pdfBlob=doc.output('blob');
   const driveOk=await uploadPDFToDrive(pdfBlob,filename,branch.name,'lens');
   const now=new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur'});
@@ -1021,9 +1027,11 @@ async function fGenerateInvoice(){
   if(!fItems.length){alert('Please add at least one line.');return;}
   const{doc,invNo,branch,supplier,period,grand}=fBuildPDF();
   const filename='Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf';
-  doc.save(filename);
-  try{localStorage.setItem('lastInvNo_other',invNo);}catch(e){}
-  if(!accessToken){showStatus('PDF downloaded. Sign in to also save to Sheets & Drive.','info');return;}
+  if(!accessToken){
+    doc.save(filename);
+    showStatus('PDF downloaded. Sign in to also save to Sheets & Drive.','info');
+    return;
+  }
   showStatus('Saving to Google Sheets & Drive...','info');
   const pdfBlob=doc.output('blob');
   const driveOk=await uploadPDFToDrive(pdfBlob,filename,branch.name,'other');
