@@ -115,7 +115,7 @@ tr:hover td{background:#fafafa;}
     <div class="section">
       <div class="section-title">Invoice details</div>
       <div class="row">
-        <div class="field"><label>Invoice no</label><input id="invNo" value="INV25-HML055"/></div>
+        <div class="field"><label>Invoice no</label><input id="invNo" placeholder="e.g. INV25-HML055"/></div>
         <div class="field"><label>Date</label><input id="invDate" type="date"/></div>
       </div>
       <div class="row">
@@ -218,7 +218,7 @@ tr:hover td{background:#fafafa;}
     <div class="section">
       <div class="section-title">Invoice details</div>
       <div class="row">
-        <div class="field"><label>Invoice no</label><input id="fInvNo" value="INV25-HML056"/></div>
+        <div class="field"><label>Invoice no</label><input id="fInvNo" placeholder="e.g. INV25-HML056"/></div>
         <div class="field"><label>Date</label><input id="fInvDate" type="date"/></div>
       </div>
       <div class="row">
@@ -330,6 +330,11 @@ let branches=[
 window.addEventListener('DOMContentLoaded',function(){
   document.getElementById('invDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('supplier').value=document.getElementById('supplierSelect').value;
+  // Restore last invoice numbers
+  const lastLens=localStorage.getItem('lastInvNo_lens');
+  const lastOther=localStorage.getItem('lastInvNo_other');
+  if(lastLens)document.getElementById('invNo').value=lastLens;
+  if(lastOther)document.getElementById('fInvNo').value=lastOther;
   renderBranchSelect();
   addRow();
   if(accessToken)initApp(true);
@@ -764,6 +769,7 @@ function generatePDFOnly(){
   if(!items.length){alert('Please add at least one line.');return;}
   const{doc,invNo,branch}=buildPDF();
   doc.save('Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf');
+  try{localStorage.setItem('lastInvNo_lens',invNo);}catch(e){}
 }
 
 async function generateInvoice(){
@@ -771,6 +777,7 @@ async function generateInvoice(){
   const{doc,invNo,branch,supplier,period,grand}=buildPDF();
   const filename='Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf';
   doc.save(filename);
+  try{localStorage.setItem('lastInvNo_lens',invNo);}catch(e){}
   if(!accessToken){showStatus('PDF downloaded. Sign in to save to Google Sheets & Drive.','info');return;}
   showStatus('Saving to Google Sheets & Drive...','info');
   // Upload PDF to Drive
@@ -982,6 +989,7 @@ function fGeneratePDFOnly(){
   if(!fItems.length){alert('Please add at least one line.');return;}
   const{doc,invNo,branch}=fBuildPDF();
   doc.save('Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf');
+  try{localStorage.setItem('lastInvNo_other',invNo);}catch(e){}
 }
 
 async function fGenerateInvoice(){
@@ -989,6 +997,7 @@ async function fGenerateInvoice(){
   const{doc,invNo,branch,supplier,period,grand}=fBuildPDF();
   const filename='Invoice_'+invNo+'_'+branch.name.replace(/\s+/g,'_')+'.pdf';
   doc.save(filename);
+  try{localStorage.setItem('lastInvNo_other',invNo);}catch(e){}
   if(!accessToken){showStatus('PDF downloaded. Sign in to also save to Sheets & Drive.','info');return;}
   showStatus('Saving to Google Sheets & Drive...','info');
   const pdfBlob=doc.output('blob');
