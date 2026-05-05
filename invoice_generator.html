@@ -330,11 +330,6 @@ let branches=[
 window.addEventListener('DOMContentLoaded',function(){
   document.getElementById('invDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('supplier').value=document.getElementById('supplierSelect').value;
-  // Restore last invoice numbers
-  const lastLens=localStorage.getItem('lastInvNo_lens');
-  const lastOther=localStorage.getItem('lastInvNo_other');
-  if(lastLens)document.getElementById('invNo').value=lastLens;
-  if(lastOther)document.getElementById('fInvNo').value=lastOther;
   renderBranchSelect();
   addRow();
   if(accessToken)initApp(true);
@@ -349,6 +344,32 @@ function initApp(ok){
   document.getElementById('signInBox').style.display='none';
   document.getElementById('mainApp').style.display='block';
   document.getElementById('userChip').innerHTML=ok?'<span class="user-chip">Connected to Google Sheets ✓</span>':'<span style="font-size:12px;color:#888;">Not signed in — PDF only</span>';
+  if(ok)loadLatestInvoiceNos();
+}
+
+async function loadLatestInvoiceNos(){
+  if(!accessToken)return;
+  try{
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A:F`,{headers:{Authorization:'Bearer '+accessToken}});
+    const data=await res.json();
+    if(!data.values||data.values.length<2)return;
+    const rows=data.values.slice(1);
+    // Detect Lens vs Other from items column (col 5): Lens has items like "I526xxx(Lens):RM..." 
+    // Other has items like "Description(Frame/Accessories):RM..."
+    let latestLens=null,latestOther=null;
+    for(let i=rows.length-1;i>=0;i--){
+      const invNo=rows[i][0];const items=rows[i][5]||'';
+      if(!invNo)continue;
+      // Heuristic: if items contain Lens, it's a lens invoice; if Frame/Accessories, it's other
+      const hasLens=/\(Lens\)/i.test(items);
+      const hasOther=/\(Frame\)|\(Accessories\)|\(Other\)/i.test(items);
+      if(hasLens&&!latestLens)latestLens=invNo;
+      if(hasOther&&!latestOther)latestOther=invNo;
+      if(latestLens&&latestOther)break;
+    }
+    if(latestLens)document.getElementById('invNo').value=latestLens;
+    if(latestOther)document.getElementById('fInvNo').value=latestOther;
+  }catch(e){console.error('Could not load latest invoice nos:',e);}
 }
 function showStatus(msg,type='info'){
   const b=document.getElementById('statusBar');b.textContent=msg;b.className='status-bar '+type;
