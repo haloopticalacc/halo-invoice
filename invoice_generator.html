@@ -433,7 +433,12 @@ function getSupplierValue(){
 
 async function uploadPDFToDrive(pdfBlob, filename, branchName){
   if(!accessToken)return false;
-  const folderId=DRIVE_FOLDERS[branchName]||DRIVE_FOLDERS['_default'];
+  // Match branch by keyword
+  let folderId=DRIVE_FOLDERS['_default'];
+  const lower=(branchName||'').toLowerCase();
+  if(lower.includes('kulai'))folderId=DRIVE_FOLDERS['Halo Optical Kulai PLT'];
+  else if(lower.includes('kepong'))folderId=DRIVE_FOLDERS['Halo Optical (Kepong) Sdn Bhd'];
+  console.log('Drive upload: branch=',branchName,'folderId=',folderId);
   const metadata={name:filename,parents:[folderId],mimeType:'application/pdf'};
   const form=new FormData();
   form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
@@ -444,9 +449,11 @@ async function uploadPDFToDrive(pdfBlob, filename, branchName){
       headers:{Authorization:'Bearer '+accessToken},
       body:form
     });
-    if(res.ok)return true;
-    const err=await res.json();console.error('Drive upload error:',err);return false;
-  }catch(e){console.error('Drive upload failed:',e);return false;}
+    if(res.ok){console.log('Drive upload success');return true;}
+    const err=await res.json();console.error('Drive upload error:',err);
+    showStatus('Drive error: '+(err.error?.message||'unknown'),'error');
+    return false;
+  }catch(e){console.error('Drive upload failed:',e);showStatus('Drive failed: '+e.message,'error');return false;}
 }
 
 function handleFileUpload(e){const f=e.target.files[0];if(f)processFile(f);}
