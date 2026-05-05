@@ -124,6 +124,7 @@ tr:hover td{background:#fafafa;}
           <div class="branch-row">
             <select id="branch"></select>
             <button class="small-btn" onclick="openBranchModal()">+ Add</button>
+            <button class="small-btn" onclick="editCurrentBranch('branch')">Edit</button>
           </div>
         </div>
         <div class="field">
@@ -225,6 +226,8 @@ tr:hover td{background:#fafafa;}
           <label>Bill to (branch)</label>
           <div class="branch-row">
             <select id="fBranch"></select>
+            <button class="small-btn" onclick="openBranchModal()">+ Add</button>
+            <button class="small-btn" onclick="editCurrentBranch('fBranch')">Edit</button>
           </div>
         </div>
         <div class="field"><label>Supplier</label><input id="fSupplier" placeholder="e.g. Luxottica"/></div>
@@ -283,11 +286,13 @@ tr:hover td{background:#fafafa;}
 
 <div class="modal-bg" id="modalBranch">
   <div class="modal">
-    <h3>Add new branch / customer</h3>
+    <h3 id="modalBranchTitle">Add new branch / customer</h3>
     <div class="field"><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Branch name</label><input id="newName" placeholder="e.g. Halo Optical (PJ) Sdn Bhd"/></div>
     <div class="field"><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Address</label><textarea id="newAddr" rows="3" placeholder="Full address"></textarea></div>
+    <div class="field"><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Phone</label><input id="newPhone" placeholder="e.g. 017 494 0266"/></div>
     <div class="field"><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Email</label><input id="newEmail" placeholder="email@example.com"/></div>
     <div class="modal-btns">
+      <button id="branchDeleteBtn" onclick="deleteBranch()" style="display:none;color:#c33;">Delete</button>
       <button onclick="closeBranchModal()">Cancel</button>
       <button class="primary" onclick="saveBranch()">Save</button>
     </div>
@@ -356,13 +361,61 @@ function renderBranchSelect(){
   const s=document.getElementById('branch');if(!s)return;
   const c=s.value;s.innerHTML=branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');if(c)s.value=c;
 }
-function openBranchModal(){document.getElementById('modalBranch').classList.add('open');}
+let editingBranchId=null;
+
+function openBranchModal(){
+  editingBranchId=null;
+  document.getElementById('modalBranchTitle').textContent='Add new branch / customer';
+  document.getElementById('branchDeleteBtn').style.display='none';
+  ['newName','newAddr','newPhone','newEmail'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('modalBranch').classList.add('open');
+}
+
+function editCurrentBranch(selectId){
+  const id=document.getElementById(selectId).value;
+  const b=branches.find(x=>x.id===id);
+  if(!b){alert('No branch selected.');return;}
+  editingBranchId=id;
+  document.getElementById('modalBranchTitle').textContent='Edit branch / customer';
+  document.getElementById('newName').value=b.name||'';
+  document.getElementById('newAddr').value=b.addr||'';
+  document.getElementById('newPhone').value=b.phone||'';
+  document.getElementById('newEmail').value=b.email||'';
+  document.getElementById('branchDeleteBtn').style.display=(id==='b1'||id==='b2')?'none':'';
+  document.getElementById('modalBranch').classList.add('open');
+}
+
 function closeBranchModal(){document.getElementById('modalBranch').classList.remove('open');}
+
+function deleteBranch(){
+  if(!editingBranchId)return;
+  if(!confirm('Delete this branch?'))return;
+  branches=branches.filter(b=>b.id!==editingBranchId);
+  renderBranchSelect();
+  if(document.getElementById('fBranch'))fInitBranch();
+  editingBranchId=null;
+  closeBranchModal();
+}
+
 function saveBranch(){
   const name=document.getElementById('newName').value.trim();if(!name){alert('Please enter a branch name.');return;}
-  branches.push({id:'b_'+Date.now(),name,addr:document.getElementById('newAddr').value.trim(),email:document.getElementById('newEmail').value.trim()});
-  renderBranchSelect();document.getElementById('branch').value=branches[branches.length-1].id;
-  ['newName','newAddr','newEmail'].forEach(id=>document.getElementById(id).value='');closeBranchModal();
+  const data={
+    name,
+    addr:document.getElementById('newAddr').value.trim(),
+    phone:document.getElementById('newPhone').value.trim(),
+    email:document.getElementById('newEmail').value.trim()
+  };
+  if(editingBranchId){
+    const b=branches.find(x=>x.id===editingBranchId);
+    if(b)Object.assign(b,data);
+  } else {
+    branches.push({id:'b_'+Date.now(),...data});
+  }
+  renderBranchSelect();
+  if(!editingBranchId)document.getElementById('branch').value=branches[branches.length-1].id;
+  if(document.getElementById('fBranch')){fInitBranch();if(!editingBranchId)document.getElementById('fBranch').value=branches[branches.length-1].id;}
+  editingBranchId=null;
+  ['newName','newAddr','newPhone','newEmail'].forEach(id=>document.getElementById(id).value='');closeBranchModal();
 }
 function switchTab(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
@@ -655,9 +708,11 @@ function buildPDF(){
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text(branch.name,20,lBillToY+6);
   doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
   const addrLines=(branch.addr||'').split('\n');
-  addrLines.forEach((l,i)=>doc.text(l,20,lBillToY+12+i*5));
-  if(branch.email)doc.text(branch.email,20,lBillToY+12+addrLines.length*5);
-  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,lBillToY+12+addrLines.length*5+(branch.email?6:0));}
+  let yOff=0;
+  addrLines.forEach((l,i)=>{doc.text(l,20,lBillToY+12+i*5);yOff=i*5+5;});
+  if(branch.phone){doc.text('Tel: '+branch.phone,20,lBillToY+12+yOff);yOff+=5;}
+  if(branch.email){doc.text(branch.email,20,lBillToY+12+yOff);yOff+=5;}
+  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,lBillToY+12+yOff+1);}
   let y=95;
   doc.setFillColor(240,240,240);doc.rect(20,y,170,7,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0);
@@ -870,9 +925,11 @@ function fBuildPDF(){
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text(branch.name,20,billToY+6);
   doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60);
   const addrLines=(branch.addr||'').split('\n');
-  addrLines.forEach((l,i)=>doc.text(l,20,billToY+12+i*5));
-  if(branch.email)doc.text(branch.email,20,billToY+12+addrLines.length*5);
-  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,billToY+12+addrLines.length*5+(branch.email?6:0));}
+  let fYOff=0;
+  addrLines.forEach((l,i)=>{doc.text(l,20,billToY+12+i*5);fYOff=i*5+5;});
+  if(branch.phone){doc.text('Tel: '+branch.phone,20,billToY+12+fYOff);fYOff+=5;}
+  if(branch.email){doc.text(branch.email,20,billToY+12+fYOff);fYOff+=5;}
+  if(supplier){doc.setTextColor(100);doc.text('Supplier ref: '+supplier,20,billToY+12+fYOff+1);}
 
   // Table header
   let y=95;
