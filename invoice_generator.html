@@ -356,15 +356,23 @@ async function loadLatestInvoiceNos(){
     const rows=data.values.slice(1);
     // Detect Lens vs Other from items column (col 5): Lens has items like "I526xxx(Lens):RM..." 
     // Other has items like "Description(Frame/Accessories):RM..."
-    // Find the latest non-empty invoice no in the sheet
-    let latestInvNo=null;
+    // Find latest invoice no for each tab based on prefix
+    // Lens: contains "HML" (e.g. INV25-HML055)
+    // Other: anything else
+    let latestLens=null,latestOther=null;
     for(let i=rows.length-1;i>=0;i--){
-      if(rows[i][0]){latestInvNo=rows[i][0];break;}
+      const invNo=rows[i][0];
+      if(!invNo)continue;
+      const isLens=/HML/i.test(invNo);
+      if(isLens){
+        if(!latestLens)latestLens=invNo;
+      } else {
+        if(!latestOther)latestOther=invNo;
+      }
+      if(latestLens&&latestOther)break;
     }
-    if(latestInvNo){
-      document.getElementById('invNo').value=latestInvNo;
-      document.getElementById('fInvNo').value=latestInvNo;
-    }
+    if(latestLens)document.getElementById('invNo').value=latestLens;
+    if(latestOther)document.getElementById('fInvNo').value=latestOther;
   }catch(e){console.error('Could not load latest invoice nos:',e);}
 }
 function showStatus(msg,type='info'){
